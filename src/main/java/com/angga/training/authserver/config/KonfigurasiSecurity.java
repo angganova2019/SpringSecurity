@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -12,6 +13,9 @@ import org.springframework.security.provisioning.JdbcUserDetailsManager;
 
 import javax.sql.DataSource;
 
+import static org.springframework.security.config.Customizer.withDefaults;
+
+@EnableWebSecurity
 public class KonfigurasiSecurity extends WebSecurityConfigurerAdapter {
 
     private static final String SQL_LOGIN = "select u.username, up.password, u.active " +
@@ -30,29 +34,25 @@ public class KonfigurasiSecurity extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        auth.userDetailsService(userDetailsService())
+        auth.jdbcAuthentication()
+                .dataSource(dataSource)
+                .usersByUsernameQuery(SQL_LOGIN)
+                .authoritiesByUsernameQuery(SQL_PERMISSION)
                 .passwordEncoder(bcryptEncoder());
     }
 
     @Bean
-    private PasswordEncoder bcryptEncoder() {
+    public PasswordEncoder bcryptEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        http.authorizeRequests()
-                .anyRequest().authenticated()
-                .and()
+        http
+                .authorizeRequests(authorize -> authorize
+                        .anyRequest().authenticated()
+                )
                 .formLogin()
                 .permitAll();
-    }
-
-    @Override
-    protected UserDetailsService userDetailsService() {
-        JdbcUserDetailsManager manager = new JdbcUserDetailsManager(this.dataSource);
-        manager.setUsersByUsernameQuery(SQL_LOGIN);
-        manager.setAuthoritiesByUsernameQuery(SQL_PERMISSION);
-        return manager;
     }
 }
